@@ -1,0 +1,38 @@
+# CLion项目忽略规则
+.idea/
+cmake-build-*/
+cmake-build/
+cmake-build-debug/
+cmake-build-release/
+build/
+out/
+
+# CMake生成的文件
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+
+# 编译产物
+*.o
+*.a
+*.so
+*.dll
+*.exe
+*.out
+*.app
+
+# CLion特定文件
+*.iml
+*.iws
+*.ipr
+
+# 临时文件
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 日志文件
+*.log

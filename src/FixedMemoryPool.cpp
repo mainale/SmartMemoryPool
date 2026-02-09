@@ -5,12 +5,12 @@
 #include <cstring>
 #include <chrono>
 #include "../include/FixedMemoryPool.h"
-
+#include <thread>
 #include <filesystem>
 
 
-FixedMemoryPool::FixedMemoryPool(size_t blockSize, size_t numBlocks)
-    :memory(nullptr),freeList(nullptr),blockSize(blockSize),numBlocks(numBlocks){
+FixedMemoryPool::FixedMemoryPool(size_t blockSize, size_t numBlocks,bool verbose = false)
+    :memory(nullptr),freeList(nullptr),blockSize(blockSize),numBlocks(numBlocks),verboseMode(verbose){
     std::cout << "Creating FixedMemoryPool" << std::endl;
     std::cout << "Block size: " << blockSize << " bytes" << std::endl;
     std::cout << "Number of blocks: " << numBlocks << std::endl;
@@ -50,7 +50,7 @@ void* FixedMemoryPool::allocate() {
     auto start = std::chrono::high_resolution_clock::now();
     if (!freeList) {
         stats.recordFailedAllocations();
-        std::cout << "Memory pool is empty!" << std::endl;
+        if (verboseMode) std::cout << "Memory pool is empty!" << std::endl;
 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration<double,std::micro>(end - start).count();
@@ -80,3 +80,24 @@ void FixedMemoryPool::deallocate(void* ptr) {
     auto duration = std::chrono::duration<double,std::micro>(end - start).count();
     stats.recordDeallocations(duration);
 }
+
+void *FixedMemoryPool::allocateThreadSafe() {
+    std::lock_guard<std::mutex> lock(poolMutex);
+    return allocate();
+}
+
+void FixedMemoryPool::deallocateThreadSafe(void *ptr) {
+    std::lock_guard<std::mutex> lock(poolMutex);
+    deallocate(ptr);
+}
+
+size_t FixedMemoryPool::getFreeBlocks() const {
+    size_t count = 0;
+    Block* current = freeList;
+    while (current != nullptr) {
+        count++;
+        current = current->next;
+    }
+    return count;
+}
+

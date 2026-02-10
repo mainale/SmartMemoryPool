@@ -28,7 +28,7 @@ private:
 
 
 public:
-    FixedMemoryPool(size_t blockSize, size_t numBlocks,bool verbose);
+    FixedMemoryPool(size_t blockSize, size_t numBlocks,bool verbose = false);
     ~FixedMemoryPool();
 
     //添加线程安全的分配/释放方法

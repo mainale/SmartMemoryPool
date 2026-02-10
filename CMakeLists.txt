@@ -15,6 +15,8 @@ add_executable(SmartMemoryPool
         main.cpp
         ${SOURCE_DIR}/FixedMemoryPool.cpp
         src/Statistics.cpp
+        include/SizeClassMemoryPool.h
+        src/SizeClassMemoryPool.cpp
 )
 
 # 如果只想编译库，可以添加：

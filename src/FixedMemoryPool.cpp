@@ -9,7 +9,7 @@
 #include <filesystem>
 
 
-FixedMemoryPool::FixedMemoryPool(size_t blockSize, size_t numBlocks,bool verbose = false)
+FixedMemoryPool::FixedMemoryPool(size_t blockSize, size_t numBlocks,bool verbose)
     :memory(nullptr),freeList(nullptr),blockSize(blockSize),numBlocks(numBlocks),verboseMode(verbose){
     std::cout << "Creating FixedMemoryPool" << std::endl;
     std::cout << "Block size: " << blockSize << " bytes" << std::endl;

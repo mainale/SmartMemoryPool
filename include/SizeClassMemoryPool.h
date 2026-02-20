@@ -61,5 +61,11 @@ class SizeClassMemoryPool {
     SizeClassMemoryPool(const SizeClassMemoryPool&) = delete;
     SizeClassMemoryPool& operator=(const SizeClassMemoryPool&) = delete;
 
+    void setAutoExpand(bool enable, size_t expandBlocks = 0) {
+        for (auto& pool : pools) {
+            pool->setAutoExpand(enable, expandBlocks);
+        }
+    }
+
 };
 #endif //SIZECLASSMEMORYPOOL_H

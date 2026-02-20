@@ -17,6 +17,9 @@ add_executable(SmartMemoryPool
         src/Statistics.cpp
         include/SizeClassMemoryPool.h
         src/SizeClassMemoryPool.cpp
+        include/MemoryPoolAllocator.h
+        include/GlobalMemoryPool.h
+        include/Config.h
 )
 
 # 如果只想编译库，可以添加：
@@ -28,3 +31,9 @@ add_executable(SmartMemoryPool
 
 # 设置可执行文件的输出目录（可选）
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
+
+# 可选的：添加编译定义
+target_compile_definitions(SmartMemoryPool PRIVATE
+        DEBUG_MODE=0  # 关闭调试输出
+        ENABLE_STATISTICS=1
+)

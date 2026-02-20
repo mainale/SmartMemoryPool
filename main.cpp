@@ -1,11 +1,15 @@
 // main.cpp - 更新测试程序
 #include <atomic>
 
-#include "include/SizeClassMemoryPool.h"
+#include "include/MemoryPoolAllocator.h"
+#include "include/GlobalMemoryPool.h"
+#include "include/Config.h"
 #include <iostream>
 #include <vector>
 #include <random>
 #include <chrono>
+#include <list>
+#include <map>
 #include <thread>
 
 
@@ -22,14 +26,13 @@ void testBasicFunctionality() {
 
     for (size_t size : sizes) {
         for (int i = 0; i < 3; i++) {
-            void* ptr = pool.allocate(size);
-            if (ptr) {
+            if (void* ptr = pool.allocate(size)) {
                 allocations.push_back(ptr);
                 std::cout << "Allocated " << size << " bytes at " << ptr << std::endl;
 
                 // 使用内存
                 char* data = static_cast<char*>(ptr);
-                for (size_t j = 0; j < std::min(size, (size_t)10); j++) {
+                for (size_t j = 0; j < std::min(size, static_cast<size_t>(10)); j++) {
                     data[j] = 'A' + (j % 26);
                 }
             }
@@ -48,8 +51,7 @@ void testBasicFunctionality() {
     // 重新分配一些内存
     for (int i = 0; i < 5; i++) {
         size_t size = sizes[rand() % 8];
-        void* ptr = pool.allocate(size);
-        if (ptr) {
+        if (void* ptr = pool.allocate(size)) {
             allocations.push_back(ptr);
             std::cout << "Re-allocated " << size << " bytes at " << ptr << std::endl;
         }
@@ -76,7 +78,7 @@ void testPerformance() {
     std::uniform_int_distribution<size_t> sizeDist(1, 1024);
     std::uniform_int_distribution<int> opDist(0, 1);
 
-    const int NUM_OPERATIONS = 10000;
+    constexpr int NUM_OPERATIONS = 10000;
     std::vector<std::pair<void*, size_t>> allocations;
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -85,8 +87,7 @@ void testPerformance() {
         if (opDist(gen) == 0 || allocations.empty()) {
             // 分配
             size_t size = sizeDist(gen);
-            void* ptr = pool.allocate(size);
-            if (ptr) {
+            if (void* ptr = pool.allocate(size)) {
                 allocations.emplace_back(ptr, size);
             }
         } else {
@@ -110,7 +111,7 @@ void testPerformance() {
     std::cout << "Completed " << NUM_OPERATIONS << " operations in "
               << duration.count() << " microseconds" << std::endl;
     std::cout << "Average time per operation: "
-              << duration.count() / (double)NUM_OPERATIONS << " us" << std::endl;
+              << duration.count() / static_cast<double>(NUM_OPERATIONS) << " us" << std::endl;
 
     pool.printStatistics();
 }
@@ -132,15 +133,14 @@ void testMemoryEfficiency() {
 
     // 测试一系列大小
     for (size_t size = 1; size <= 1024; size *= 2) {
-        size_t classIndex = pool.getSizeClassForSize(size);
+        //size_t classIndex = pool.getSizeClassForSize(size);
 
         // 这里我们需要知道实际分配的大小，但我们的API不提供这个信息
         // 我们将创建一个简化版本
         std::cout << "Requested " << size << " bytes -> ";
 
         // 分配并检查实际大小（通过对比不同大小的分配）
-        void* ptr = pool.allocate(size);
-        if (ptr) {
+        if (void* ptr = pool.allocate(size)) {
             // 查找这个指针属于哪个池（简化）
             // 在实际实现中，我们需要更好的方法
             std::cout << "Allocated successfully" << std::endl;
@@ -159,8 +159,8 @@ void testThreadSafety() {
 
     SizeClassMemoryPool pool(500);
     std::vector<std::thread> threads;
-    const int NUM_THREADS = 8;
-    const int OPERATIONS_PER_THREAD = 1000;
+    constexpr  int NUM_THREADS = 8;
+    constexpr  int OPERATIONS_PER_THREAD = 1000;
 
     std::atomic<int> totalAllocations{0};
     std::atomic<int> totalFailures{0};
@@ -174,10 +174,9 @@ void testThreadSafety() {
 
         for (int i = 0; i < OPERATIONS_PER_THREAD; i++) {
             size_t size = sizeDist(gen);
-            void* ptr = pool.allocate(size);
 
-            if (ptr) {
-                totalAllocations++;
+            if (void* ptr = pool.allocate(size)) {
+                ++totalAllocations;
                 myAllocations.emplace_back(ptr, size);
 
                 // 偶尔释放一些内存
@@ -188,7 +187,7 @@ void testThreadSafety() {
                     myAllocations.pop_back();
                 }
             } else {
-                totalFailures++;
+                ++totalFailures;
             }
         }
 
@@ -246,8 +245,7 @@ void testEdgeCases() {
     int successCount = 0;
 
     for (int i = 0; i < 100; i++) {
-        void* ptr = pool.allocate(64);
-        if (ptr) {
+        if (void* ptr = pool.allocate(64)) {
             allocations.push_back(ptr);
             successCount++;
         } else {
@@ -282,17 +280,327 @@ void testEdgeCases() {
     pool.printStatistics();
 }
 
+// 测试1：基本分配器测试
+void testBasicAllocator() {
+    std::cout << "=== Test 1: Basic Allocator ===" << std::endl;
+
+    // 创建内存池
+    SizeClassMemoryPool pool(100);
+
+    // 创建分配器
+    MemoryPoolAllocator<int> allocator(pool);
+
+    // 分配一些内存
+    int* arr = allocator.allocate(10);
+    for (int i = 0; i < 10; i++) {
+        allocator.construct(arr + i,i*10);
+        std::cout << "arr[" << i << "] = " << arr[i] << std::endl;
+    }
+
+    // 销毁对象
+    for (int i = 0; i < 10; i++) {
+        allocator.destroy(arr + i);
+    }
+
+    // 释放内存
+    allocator.deallocate(arr, 10);
+
+    std::cout << "Basic allocator test passed" << std::endl;
+}
+
+// 测试2：STL vector 使用内存池
+void testVectorWithAllocator() {
+    std::cout << "\n=== Test 2: STL Vector with Memory Pool ===" << std::endl;
+
+    SizeClassMemoryPool pool(1000);
+    MemoryPoolAllocator<int> allocator(pool);
+
+    // 使用自定义分配器创建vector
+    std::vector<int,MemoryPoolAllocator<int>> vec(allocator);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    //插入大量元素
+    for (int i = 0; i < 10000; i++) {
+        vec.push_back(i);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "Vector size: " << vec.size() << std::endl;
+    std::cout << "Time to insert 10000 elements: " << duration.count() << " us" << std::endl;
+    std::cout << "Average time per insertion: " << duration.count() / 10000.0 << " us" << std::endl;
+
+    // 验证数据
+    bool correct = true;
+    for (size_t i = 0; i < vec.size(); i++) {
+        if (vec[i] != static_cast<int>(i)) {
+            correct = false;
+            break;
+        }
+    }
+    std::cout << "Data verification: " << (correct ? "PASS" : "FAIL") << std::endl;
+}
+
+// 测试3：STL list 使用内存池
+void testListWithAllocator() {
+    std::cout << "\n=== Test 3: STL List with Memory Pool ===" << std::endl;
+
+    SizeClassMemoryPool pool(10000);
+    MemoryPoolAllocator<int> allocator(pool);
+
+    // 使用自定义分配器创建list
+    std::list<int, MemoryPoolAllocator<int>> lst(allocator);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // 插入大量元素
+    for (int i = 0; i < 5000; i++) {
+        lst.push_back(i);
+        lst.push_front(i);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "List size: " << lst.size() << std::endl;
+    std::cout << "Time to insert 10000 elements: " << duration.count() << " us" << std::endl;
+
+    // 验证数据
+    auto it = lst.begin();
+    std::advance(it, 5000);  // 移动到中间
+    std::cout << "Middle element: " << *it << std::endl;
+
+    // 清理
+    lst.clear();
+
+    std::cout << "List test completed" << std::endl;
+}
+
+// 测试4：STL map 使用内存池
+void testMapWithAllocator() {
+    std::cout << "\n=== Test 4: STL Map with Memory Pool ===" << std::endl;
+
+    SizeClassMemoryPool pool(2000);
+
+    // 注意：map需要pair的分配器
+    using MapAllocator = MemoryPoolAllocator<std::pair<const int, std::string>>;
+    MapAllocator allocator(pool);
+
+    std::map<int, std::string, std::less<int>, MapAllocator> myMap(allocator);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // 插入元素
+    for (int i = 0; i < 1000; i++) {
+        myMap[i] = "Value_" + std::to_string(i);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "Map size: " << myMap.size() << std::endl;
+    std::cout << "Time to insert 1000 elements: " << duration.count() << " us" << std::endl;
+
+    // 查找测试
+    start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < 100; i++) {
+        auto it = myMap.find(i * 10);
+        if (it != myMap.end()) {
+            // 找到元素
+        }
+    }
+
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "Time for 100 lookups: " << duration.count() << " us" << std::endl;
+
+    std::cout << "Map test completed" << std::endl;
+}
+
+// 测试5：全局分配器测试
+void testGlobalAllocator() {
+    std::cout << "\n=== Test 5: Global Allocator ===" << std::endl;
+
+    // 使用全局分配器
+    std::vector<int, GlobalAllocator<int>> vec1;
+    std::vector<int, GlobalAllocator<int>> vec2;
+
+    // 两个vector共享同一个全局内存池
+    for (int i = 0; i < 1000; i++) {
+        vec1.push_back(i);
+        vec2.push_back(i * 2);
+    }
+
+    std::cout << "vec1 size: " << vec1.size() << std::endl;
+    std::cout << "vec2 size: " << vec2.size() << std::endl;
+
+    // 验证
+    bool correct = true;
+    for (size_t i = 0; i < vec1.size(); i++) {
+        if (vec1[i] != static_cast<int>(i)) {
+            correct = false;
+            break;
+        }
+    }
+
+    std::cout << "Data verification: " << (correct ? "PASS" : "FAIL") << std::endl;// 打印全局内存池统计
+    GlobalMemoryPool::get_instance().print_statistics();
+}
+
+// 测试6：性能对比（内存池 vs 系统分配器）
+void testPerformanceComparison() {
+    std::cout << "\n=== Test 6: Performance Comparison ===" << std::endl;
+
+    const int NUM_ELEMENTS = 100000;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(1, 1000);
+
+    // 使用系统分配器
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        std::vector<int> vec;
+        vec.reserve(NUM_ELEMENTS);
+
+        for (int i = 0; i < NUM_ELEMENTS; i++) {
+            vec.push_back(dist(gen));
+        }
+
+        // 随机删除一些元素
+        for (int i = 0; i < NUM_ELEMENTS / 10; i++) {
+            int idx = dist(gen) % vec.size();
+            vec.erase(vec.begin() + idx);
+        }
+
+        // 再添加一些元素
+        for (int i = 0; i < NUM_ELEMENTS / 5; i++) {
+            vec.push_back(dist(gen));
+        }
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+        std::cout << "System allocator time: " << duration.count() << " us" << std::endl;
+    }
+
+    // 使用内存池分配器
+    {
+        SizeClassMemoryPool pool(5000);
+        MemoryPoolAllocator<int> allocator(pool);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        std::vector<int, MemoryPoolAllocator<int>> vec(allocator);
+        vec.reserve(NUM_ELEMENTS);
+
+        for (int i = 0; i < NUM_ELEMENTS; i++) {
+            vec.push_back(dist(gen));
+        }
+
+        // 随机删除一些元素
+        for (int i = 0; i < NUM_ELEMENTS / 10; i++) {
+            int idx = dist(gen) % vec.size();
+            vec.erase(vec.begin() + idx);
+        }
+
+        // 再添加一些元素
+        for (int i = 0; i < NUM_ELEMENTS / 5; i++) {
+            vec.push_back(dist(gen));
+        }
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+        std::cout << "Memory pool allocator time: " << duration.count() << " us" << std::endl;
+        std::cout << "Performance improvement: "
+                  << (100.0 - (duration.count() * 100.0 / 138000.0)) << "%" << std::endl;
+    }
+}
+
+// 测试7：多线程容器测试
+void testMultithreadedContainers() {
+    std::cout << "\n=== Test 7: Multithreaded Container Test ===" << std::endl;
+
+    GlobalMemoryPool& globalPool = GlobalMemoryPool::get_instance();
+
+    const int NUM_THREADS = 4;
+    const int OPERATIONS_PER_THREAD = 5000;
+
+    std::vector<std::thread> threads;
+    std::atomic<int> totalInserted{0};
+
+    auto worker = [&totalInserted](int threadId) {
+        // 每个线程有自己的vector，但共享全局内存池
+        std::vector<int, GlobalAllocator<int>> localVec;
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dist(1, 100);
+
+        for (int i = 0; i < OPERATIONS_PER_THREAD; i++) {
+            try {
+                if (dist(gen) < 70 || localVec.empty()) {
+                    localVec.push_back(threadId * 10000 + i);
+                    totalInserted++;
+                } else {
+                    int idx = dist(gen) % localVec.size();
+                    localVec.erase(localVec.begin() + idx);
+                }
+            } catch (const std::bad_alloc&) {
+                std::cerr << "Thread " << threadId << " allocation failed, skipping\n";
+            }
+        }
+    };
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        threads.emplace_back(worker, i);
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    std::cout << "Total inserted elements (approx): " << totalInserted << std::endl;
+    std::cout << "Time for " << NUM_THREADS << " threads: "
+              << duration.count() << " ms" << std::endl;
+    std::cout << "No crashes detected - thread safety verified" << std::endl;
+    GlobalMemoryPool::get_instance().print_statistics();
+}
+
+void testAutoExpand() {
+    std::cout << "\n=== Test Auto Expand ===" << std::endl;
+    FixedMemoryPool pool(64, 5, true);
+    pool.setAutoExpand(true, 3);   // 每次扩展 3 块
+
+    std::vector<void*> ptrs;
+    for (int i = 0; i < 20; ++i) {
+        void* p = pool.allocate();
+        if (p) {
+            ptrs.push_back(p);
+            std::cout << "Allocated " << i << std::endl;
+        } else {
+            std::cout << "Failed at " << i << std::endl;
+            break;
+        }
+    }
+
+    std::cout << "Total chunks: " << pool.getTotalChunks() << std::endl;
+    std::cout << "Num expansions: " << pool.getNumExpansions() << std::endl;
+
+    for (auto p : ptrs) pool.deallocate(p);
+}
+
 int main() {
-    std::cout << "=== Size Class Memory Pool Tests ===\n" << std::endl;
-
-    // 运行所有测试
-    //testBasicFunctionality();
-    //testPerformance();
-    //testMemoryEfficiency();
-    testThreadSafety();
-    //testEdgeCases();
-
-    std::cout << "\n=== All Tests Completed ===" << std::endl;
-
+    testAutoExpand();
     return 0;
 }

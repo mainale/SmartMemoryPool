@@ -4,7 +4,7 @@ project(SmartMemoryPool VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 选项（用于控制构建测试和示例）
+# 选项
 option(BUILD_TESTING "Build unit tests" ON)
 option(BUILD_EXAMPLES "Build example programs" ON)
 
@@ -21,9 +21,11 @@ set(SOURCES
 # 创建静态库
 add_library(MemoryPool STATIC ${SOURCES})
 
-# 线程支持（跨平台）
-find_package(Threads REQUIRED)
-target_link_libraries(MemoryPool PRIVATE Threads::Threads)
+# 线程支持：仅在非 MSVC 平台上需要显式链接
+if(NOT MSVC)
+    find_package(Threads REQUIRED)
+    target_link_libraries(MemoryPool PUBLIC Threads::Threads)
+endif()
 
 # 编译定义
 target_compile_definitions(MemoryPool PRIVATE
@@ -31,7 +33,7 @@ target_compile_definitions(MemoryPool PRIVATE
         THROW_ON_ALLOC_FAIL=0
 )
 
-# AddressSanitizer for Debug builds（按编译器区分）
+# AddressSanitizer 支持（按编译器区分）
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(MemoryPool PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -42,10 +44,15 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     endif()
 endif()
 
-# 测试程序
+# ==================== 测试程序 ====================
 if(BUILD_TESTING)
     add_executable(run_tests tests/TestAllocator.cpp)
-    target_link_libraries(run_tests MemoryPool Threads::Threads)
+    target_link_libraries(run_tests MemoryPool)
+    if(NOT MSVC)
+        target_link_libraries(run_tests Threads::Threads)
+    endif()
+
+    # 为测试添加 ASan 支持
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             target_compile_options(run_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -57,43 +64,38 @@ if(BUILD_TESTING)
     endif()
 endif()
 
-# 示例程序
+# ==================== 示例程序 ====================
 if(BUILD_EXAMPLES)
-    add_executable(example1_basic examples/example1_basic.cpp)
-    target_link_libraries(example1_basic MemoryPool Threads::Threads)
-
-    add_executable(example2_stl_vector examples/example2_stl_vector.cpp)
-    target_link_libraries(example2_stl_vector MemoryPool Threads::Threads)
-
-    add_executable(example3_multithread examples/example3_multithread.cpp)
-    target_link_libraries(example3_multithread MemoryPool Threads::Threads)
-
-    add_executable(example4_auto_expand examples/example4_auto_expand.cpp)
-    target_link_libraries(example4_auto_expand MemoryPool Threads::Threads)
-
-    # 为示例添加 ASan 支持
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-            foreach(target example1_basic example2_stl_vector example3_multithread example4_auto_expand)
-                target_compile_options(${target} PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-                target_link_options(${target} PRIVATE -fsanitize=address)
-            endforeach()
-        elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-            foreach(target example1_basic example2_stl_vector example3_multithread example4_auto_expand)
-                target_compile_options(${target} PRIVATE /fsanitize=address)
-                target_link_options(${target} PRIVATE /fsanitize=address)
-            endforeach()
+    macro(add_example name source)
+        add_executable(${name} ${source})
+        target_link_libraries(${name} MemoryPool)
+        if(NOT MSVC)
+            target_link_libraries(${name} Threads::Threads)
         endif()
-    endif()
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+                target_compile_options(${name} PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+                target_link_options(${name} PRIVATE -fsanitize=address)
+            elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+                target_compile_options(${name} PRIVATE /fsanitize=address)
+                target_link_options(${name} PRIVATE /fsanitize=address)
+            endif()
+        endif()
+    endmacro()
+
+    add_example(example1_basic examples/example1_basic.cpp)
+    add_example(example2_stl_vector examples/example2_stl_vector.cpp)
+    add_example(example3_multithread examples/example3_multithread.cpp)
+    add_example(example4_auto_expand examples/example4_auto_expand.cpp)
 endif()
 
-# 测试注册
+# ==================== 测试注册 ====================
 enable_testing()
 if(BUILD_TESTING)
     add_test(NAME MemoryPoolTest COMMAND run_tests)
 endif()
 
-# 安装规则
+# ==================== 安装规则 ====================
 install(DIRECTORY include/ DESTINATION include
         FILES_MATCHING PATTERN "*.h"
 )

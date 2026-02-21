@@ -4,7 +4,7 @@ project(SmartMemoryPool VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(BUILD_TESTING "Build unit tests" ON)
+option(BUILD_TESTING "Build unit tests" OFF)
 option(BUILD_EXAMPLES "Build example programs" ON)
 
 include_directories(include)
@@ -63,7 +63,10 @@ endmacro()
 
 # 测试程序
 if(BUILD_TESTING)
-    add_my_executable(run_tests tests/TestAllocator.cpp)
+    add_executable(run_tests tests/TestAllocator.cpp)
+    target_link_libraries(run_tests MemoryPool)
+    enable_testing()
+    add_test(NAME MemoryPoolTest COMMAND run_tests)
 endif()
 
 # 示例程序

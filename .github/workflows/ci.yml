@@ -31,3 +31,6 @@ jobs:
       - name: Run tests
         working-directory: build
         run: ctest --output-on-failure -C ${{ matrix.build_type }}
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_VERBOSE_MAKEFILE=ON

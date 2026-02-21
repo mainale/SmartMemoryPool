@@ -9,7 +9,6 @@ option(BUILD_EXAMPLES "Build example programs" ON)
 
 include_directories(include)
 
-# 核心库源文件（不含测试）
 set(SOURCES
         src/FixedMemoryPool.cpp
         src/Statistics.cpp
@@ -20,8 +19,11 @@ add_library(MemoryPool STATIC ${SOURCES})
 
 # ---------- 线程处理 ----------
 if(MSVC)
-    # MSVC 不需要任何线程库，但为了代码安全，定义一个空的 Threads::Threads 目标
-    add_library(Threads::Threads INTERFACE IMPORTED)
+    # MSVC 不需要任何线程库。设置一个变量以禁用任何可能的 pthread 搜索。
+    set(CMAKE_THREAD_PREFER_PTHREAD FALSE)
+    # 确保没有意外调用 find_package(Threads)
+    # 我们不链接任何线程库
+    message(STATUS "MSVC detected: No thread library will be linked.")
 else()
     find_package(Threads REQUIRED)
     target_link_libraries(MemoryPool PUBLIC Threads::Threads)
@@ -33,7 +35,7 @@ target_compile_definitions(MemoryPool PRIVATE
         THROW_ON_ALLOC_FAIL=0
 )
 
-# AddressSanitizer（按编译器区分）
+# AddressSanitizer 支持
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(MemoryPool PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -44,7 +46,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     endif()
 endif()
 
-# 辅助宏：添加可执行文件（确保只链接 MemoryPool，不含任何 pthread）
+# 宏：添加可执行文件，只链接 MemoryPool
 macro(add_my_executable target_name source_file)
     add_executable(${target_name} ${source_file})
     target_link_libraries(${target_name} PRIVATE MemoryPool)

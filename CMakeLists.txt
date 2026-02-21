@@ -17,6 +17,24 @@ set(SOURCES
 # 创建静态库
 add_library(MemoryPool STATIC ${SOURCES})
 
+# AddressSanitizer for Debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-fsanitize=address" HAS_ASAN)
+    if(HAS_ASAN)
+        target_compile_options(MemoryPool PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+        target_link_options(MemoryPool PRIVATE -fsanitize=address)
+
+        # 也应用到测试和示例
+        foreach(target IN ITEMS run_tests example1_basic example2_stl_vector example3_multithread example4_auto_expand)
+            if(TARGET ${target})
+                target_compile_options(${target} PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+                target_link_options(${target} PRIVATE -fsanitize=address)
+            endif()
+        endforeach()
+    endif()
+endif()
+
 # 编译定义
 target_compile_definitions(MemoryPool PRIVATE
         ENABLE_VERBOSE=$<CONFIG:Debug>
@@ -84,3 +102,9 @@ install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/MemoryPoolConfigVersion.cmake"
         DESTINATION lib/cmake/MemoryPool
 )
+
+enable_testing()
+
+if(BUILD_TESTING)
+    add_test(NAME AllocatorTest COMMAND run_tests)
+endif()

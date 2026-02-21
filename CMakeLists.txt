@@ -1,3 +1,6 @@
+find_package(Threads REQUIRED)
+option(BUILD_TESTS "Build unit tests" OFF)
+option(BUILD_EXAMPLES "Build example programs" OFF)
 cmake_minimum_required(VERSION 3.21)
 project(SmartMemoryPool)
 
@@ -43,20 +46,20 @@ target_compile_definitions(MemoryPool PRIVATE
 
 # 主测试程序（可选，如果希望保留之前的测试）
 add_executable(run_tests tests/TestAllocator.cpp)
-target_link_libraries(run_tests MemoryPool pthread)
+target_link_libraries(run_tests MemoryPool Threads::Threads)
 
 # 示例程序
 add_executable(example1_basic examples/example1_basic.cpp)
-target_link_libraries(example1_basic MemoryPool pthread)
+target_link_libraries(example1_basic MemoryPool Threads::Threads)
 
 add_executable(example2_stl_vector examples/example2_stl_vector.cpp)
-target_link_libraries(example2_stl_vector MemoryPool pthread)
+target_link_libraries(example2_stl_vector MemoryPool Threads::Threads)
 
 add_executable(example3_multithread examples/example3_multithread.cpp)
-target_link_libraries(example3_multithread MemoryPool pthread)
+target_link_libraries(example3_multithread MemoryPool Threads::Threads)
 
 add_executable(example4_auto_expand examples/example4_auto_expand.cpp)
-target_link_libraries(example4_auto_expand MemoryPool pthread)
+target_link_libraries(example4_auto_expand MemoryPool Threads::Threads)
 
 
 

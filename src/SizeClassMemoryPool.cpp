@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
-#include <cmath>
 #include <thread>
 
 SizeClassMemoryPool::SizeClassMemoryPool():SizeClassMemoryPool(100) {
@@ -43,11 +42,6 @@ void SizeClassMemoryPool::initializeSizeClasses() {
         sizeClasses.push_back(size);
         size *= 2;
     }
-    /*std::cout << "Size classes1: ";
-    for (size_t i = 0; i < sizeClasses.size(); i++) {
-        std::cout << sizeClasses[i] << ' ';
-    }
-    std::cout << std::endl;*/
 
     // 添加一些中间等级（减少内存浪费）
     // 例如：24, 48, 96, 192, 384, 768
@@ -59,25 +53,14 @@ void SizeClassMemoryPool::initializeSizeClasses() {
     }
     // 合并并排序
     sizeClasses.insert(sizeClasses.end(), interMediate.begin(), interMediate.end());
-    /*std::cout << "Size classes2: ";
-    for (size_t i = 0; i < sizeClasses.size(); i++) {
-        std::cout << sizeClasses[i] << ' ';
-    }*/
+
     std::cout << std::endl;
     std::sort(sizeClasses.begin(), sizeClasses.end());
-    /*std::cout << "Size classes3: ";
-    for (size_t i = 0; i < sizeClasses.size(); i++) {
-        std::cout << sizeClasses[i] << ' ';
-    }
-    std::cout << std::endl;*/
+
 
     //移除重复
     sizeClasses.erase(unique(sizeClasses.begin(),sizeClasses.end()),sizeClasses.end());
-    /*std::cout << "Size classes4: ";
-    for (size_t i = 0; i < sizeClasses.size(); i++) {
-        std::cout << sizeClasses[i] << ' ';
-    }
-    std::cout << std::endl;*/
+
 
     // 打印大小等级
     std::cout << "Size classes: ";
@@ -118,33 +101,19 @@ void* SizeClassMemoryPool::allocate(size_t size) {
     //找到合适的大小等级
     size_t classIndex = getSizeClass(alignSize);
 
-    /*if (classIndex < sizeClasses.size() && sizeClasses[classIndex] == 24) {
-        std::cout << "DEBUG: allocating 24 bytes from thread "
-                  << std::this_thread::get_id() << std::endl;
-    }*/
-
-    // 调试：打印大小等级信息
-    // if (size > 100) {  // 只打印大对象调试信息
-    //     std::cout << "DEBUG: size=" << size
-    //               << ", aligned=" << alignSize
-    //               << ", classIndex=" << classIndex
-    //               << ", classSize=" << (classIndex < sizeClasses.size() ? sizeClasses[classIndex] : 0)
-    //               << std::endl;
-    // }
-    // for (size_t i = 0; i < sizeClasses.size(); i++) {
-    //     std::cout << sizeClasses[i] << " " << std::endl;
-    // }
 
     // 检查是否超过最大大小等级
     if (classIndex >= sizeClasses.size()) {
-        /*std::cerr << "Error: Requested size " << size
-          << " exceeds maximum size class ("
-          << sizeClasses.back() << ")" << std::endl;
-        return nullptr;*/
-        // 大对象处理：直接使用 new（后续可以改进）
-        std::cerr << "Warning: Large object allocation (" << size
-                  << " bytes), using system allocator" << std::endl;
-        return ::operator new(size);
+        // 大对象
+        void* ptr = allocateLarge(size);
+        if (!ptr) {
+#if THROW_ON_ALLOC_FAIL
+            throw std::bad_alloc();
+#else
+            return nullptr;
+#endif
+        }
+        return ptr;
     }
 
     // 从对应的池中分配
@@ -157,8 +126,7 @@ void* SizeClassMemoryPool::allocate(size_t size) {
     }
     else {
         stats[classIndex].failedAllocations++;
-        /*std::cerr << "Warning: Allocation failed for size " << size
-                  << " (size class: " << allocatedSize << ")" << std::endl;*/
+
 #ifdef DEBUG_MODE
         std::cerr << "Warning: Allocation failed for size " << size
                   << " (size class: " << allocatedSize << ")" << std::endl;
@@ -178,9 +146,8 @@ void SizeClassMemoryPool::deallocate(void* ptr,size_t size) {
 
     // 检查索引有效性
     if (classIndex >= sizeClasses.size()) {
-        // std::cerr << "Error: Invalid size for deallocation: " << size << std::endl;
-        // 大对象：使用 operator delete
-        ::operator delete(ptr);
+        // 大对象释放
+        deallocateLarge(ptr, size);
         return;
     }
 
@@ -242,6 +209,13 @@ void SizeClassMemoryPool::printStatistics() const {
     std::cout << "  Total failed allocations: " << totalFailed << std::endl;
     std::cout << "  Total allocated bytes: " << totalBytes << std::endl;
 
+    // 大对象统计
+    std::cout << "\nLarge Objects:" << std::endl;
+    std::cout << "  Allocations: " << largeStats_.allocations << std::endl;
+    std::cout << "  Deallocations: " << largeStats_.deallocations << std::endl;
+    std::cout << "  Failed Allocations: " << largeStats_.failedAllocations << std::endl;
+    std::cout << "  Total Bytes: " << largeStats_.totalBytes << std::endl;
+
     // 计算平均内存效率（简化）
     if (totalAllocations > 0) {
         double avgEfficiency = 100.0;  // 简化计算
@@ -250,6 +224,26 @@ void SizeClassMemoryPool::printStatistics() const {
                   << avgEfficiency << "%" << std::endl;
     }
     std::cout << "===========================================\n" << std::endl;
+}
+
+void* SizeClassMemoryPool::allocateLarge(size_t size) {
+    void* ptr = nullptr;
+    try {
+        ptr = ::operator new(size);
+    } catch (const std::bad_alloc&) {
+        largeStats_.failedAllocations++;
+        return nullptr;
+    }
+    largeStats_.allocations++;
+    largeStats_.totalBytes += size;
+    return ptr;
+}
+
+void SizeClassMemoryPool::deallocateLarge(void* ptr, size_t size) {
+    if (!ptr) return;
+    ::operator delete(ptr);
+    largeStats_.deallocations++;
+    // size 参数用于统计，此处可忽略
 }
 
 

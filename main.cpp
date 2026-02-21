@@ -600,7 +600,31 @@ void testAutoExpand() {
     for (auto p : ptrs) pool.deallocate(p);
 }
 
+void testLargeObject() {
+    std::cout << "\n=== Test Large Object ===" << std::endl;
+    SizeClassMemoryPool pool(100);  // 小池，但大对象不受限
+
+    // 分配超过 1024 字节的对象
+    size_t largeSize = 2048;
+    void* ptr = pool.allocate(largeSize);
+    if (ptr) {
+        std::cout << "Allocated large object of size " << largeSize << " successfully" << std::endl;
+        // 简单写入数据
+        char* data = static_cast<char*>(ptr);
+        for (size_t i = 0; i < largeSize; ++i) {
+            data[i] = 'A' + (i % 26);
+        }
+        // 释放
+        pool.deallocate(ptr, largeSize);
+        std::cout << "Deallocated large object" << std::endl;
+    } else {
+        std::cout << "Failed to allocate large object" << std::endl;
+    }
+
+    pool.printStatistics();
+}
+
 int main() {
-    testAutoExpand();
+    testLargeObject();
     return 0;
 }

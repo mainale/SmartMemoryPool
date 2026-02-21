@@ -5,13 +5,12 @@
 #include <cstring>
 #include <chrono>
 #include "../include/FixedMemoryPool.h"
-#include <thread>
 #include <filesystem>
 
 
-FixedMemoryPool::FixedMemoryPool(size_t blockSize, size_t numBlocks,bool verbose)
+FixedMemoryPool::FixedMemoryPool(const size_t blockSize, const size_t numBlocks, const bool verbose)
     :memory(nullptr),freeList(nullptr),blockSize(blockSize),numBlocks(numBlocks),
-    autoExpandEnabled_(false), expandBlocks_(0), totalChunks_(numBlocks), numExpansions_(0),verboseMode(verbose) {
+    verboseMode(verbose), autoExpandEnabled_(false), expandBlocks_(0), totalChunks_(numBlocks),numExpansions_(0) {
     if(verboseMode){
         std::cout << "Creating FixedMemoryPool" << std::endl;
         std::cout << "Block size: " << blockSize << " bytes" << std::endl;
@@ -71,38 +70,7 @@ void* FixedMemoryPool::allocate() {
         }
     }
     return ptr;
-    /*if (!freeList) {
-        // 如果允许自动扩展，尝试扩展
-        if (autoExpandEnabled_) {
-            if (!expandPool()) {
-                // 扩展失败，记录分配失败
-                stats.recordFailedAllocations();
-                /*auto end = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration<double, std::micro>(end - start).count();#1#
-                if (verboseMode) {
-                    std::cerr << "Memory pool expansion failed!" << std::endl;
-                }
-                return nullptr;
-            }
-        } else {
-            stats.recordFailedAllocations();
-            /*auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration<double, std::micro>(end - start).count();#1#
-            if (verboseMode) {
-                std::cerr << "Memory pool is empty!" << std::endl;
-            }
-            return nullptr;
-        }
-    }
-    Block* block = freeList;
-    freeList = freeList->next;
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration<double,std::micro>(end - start).count();
-    stats.recordAllocations(blockSize,duration);
-
-
-    return static_cast<void *>(block);*/
 }
 
 void FixedMemoryPool::deallocate(void* ptr) {
@@ -111,7 +79,7 @@ void FixedMemoryPool::deallocate(void* ptr) {
         std::cerr << "Warning: Trying to deallocate nullptr" << std::endl;
         return;
     }
-    Block* block = static_cast<Block*>(ptr);
+    auto* block = static_cast<Block*>(ptr);
     block->next = freeList;
     freeList = block;
     auto end = std::chrono::high_resolution_clock::now();
@@ -193,7 +161,7 @@ bool FixedMemoryPool::expandPool() {
     chunks_.push_back(newMemory);
 
     // 将新内存块链接到空闲链表
-    Block* newBlock = reinterpret_cast<Block*>(newMemory);
+    auto* newBlock = reinterpret_cast<Block*>(newMemory);
     Block* current = newBlock;
     for (size_t i = 0; i < expandSize - 1; i++) {
         char* next = reinterpret_cast<char*>(current) + blockSize;
@@ -242,7 +210,7 @@ bool FixedMemoryPool::expandPoolImpl() {
     memset(newMemory, 0, expandSize * blockSize);
     chunks_.push_back(newMemory);
 
-    Block* newBlock = reinterpret_cast<Block*>(newMemory);
+    auto* newBlock = reinterpret_cast<Block*>(newMemory);
     Block* current = newBlock;
     for (size_t i = 0; i < expandSize - 1; i++) {
         char* next = reinterpret_cast<char*>(current) + blockSize;

@@ -31,6 +31,14 @@ class SizeClassMemoryPool {
     };
     std::vector<SizeClassStats> stats;
 
+    // 大对象统计
+    struct LargeObjectStats {
+        size_t allocations = 0;
+        size_t deallocations = 0;
+        size_t totalBytes = 0;
+        size_t failedAllocations = 0;
+    } largeStats_;
+
     //根据请求大小找到合适的大小等级
     size_t getSizeClass(size_t size) const;
 
@@ -39,6 +47,10 @@ class SizeClassMemoryPool {
 
     //初始化大小等级
     void initializeSizeClasses();
+
+    // 大对象分配/释放函数
+    void* allocateLarge(size_t size);
+    void deallocateLarge(void* ptr, size_t size);
 
     public:
     SizeClassMemoryPool();

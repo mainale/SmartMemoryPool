@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        run: cmake --build build --config ${{ matrix.build_type }} --verbose
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }}
